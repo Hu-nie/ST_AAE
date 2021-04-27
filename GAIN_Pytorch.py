@@ -4,8 +4,7 @@ import numpy as np
 from tqdm import tqdm
 import torch.nn.functional as F
 import torch.nn as nn
-
-torch.manual_seed(1)
+from utils import *
 
 dataset_file = 'data/V_228.csv'
 
@@ -18,7 +17,7 @@ mb_size = 128
 # 2. Missing rate
 p_miss = 0.2
 # 3. Hint rate
-p_hint = 0
+p_hint = 0.8
 # 4. Loss Hyperparameters
 alpha = 10
 # 5. Train Rate
@@ -74,18 +73,6 @@ testX = Data[idx[Train_No:],:]
 trainM = Missing[idx[:Train_No],:]
 testM = Missing[idx[Train_No:],:]
 
-    
-# Hint Vector Generation
-def sample_M(m, n, p):
-    A = np.random.uniform(0., 1., size = [m, n])
-    B = A > p
-    C = 1.*B
-    return C
-
-def xavier_init(size):
-    in_dim = size[0]
-    xavier_stddev = 1. / np.sqrt(in_dim / 2.)
-    return np.random.normal(size = size, scale = xavier_stddev)
 
 class Generator(nn.Module):
     def __init__(self):
@@ -96,13 +83,21 @@ class Generator(nn.Module):
         self.relu = nn.ReLU(True)
         self.sigmoid = nn.Sigmoid()
 
+        nn.init.zeros_(self.fc.bias)
+        nn.init.zeros_(self.fc2.bias)
+        nn.init.zeros_(self.fc3.bias)
+
+        nn.init.xavier_normal_(self.fc.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
+        nn.init.xavier_normal_(self.fc3.weight)
+        
+
     def forward(self,  New_X, M):
-        x = torch.cat(dim=1, tensors=[New_X, M])
-        x = x.float()
-        x = self.relu(self.fc(x))
-        outputs = self.relu(self.fc2(x))
-        outputs = self.relu(self.fc3(outputs))
-        return self.sigmoid(outputs)
+        inputs = torch.cat(dim=1, tensors=[New_X, M])
+        inputs = inputs.float()
+        outputs = self.relu(self.fc(inputs))
+        outputs = self.relu(self.fc2(outputs))
+        return self.sigmoid(self.fc3(outputs))
 
 
 class Discriminator(nn.Module):
@@ -114,22 +109,25 @@ class Discriminator(nn.Module):
         self.relu = nn.ReLU(True)
         self.sigmoid = nn.Sigmoid()
 
+        nn.init.zeros_(self.fc.bias)
+        nn.init.zeros_(self.fc2.bias)
+        nn.init.zeros_(self.fc3.bias)
+
+        nn.init.zeros_(self.fc.bias)
+        nn.init.zeros_(self.fc2.bias)
+        nn.init.zeros_(self.fc3.bias)
+
+        nn.init.xavier_normal_(self.fc.weight)
+        nn.init.xavier_normal_(self.fc2.weight)
+        nn.init.xavier_normal_(self.fc3.weight)
+
     def forward(self,New_X, H):
-        x = torch.cat(dim=1, tensors=[New_X, H])
-        x = x.float()
-        x = self.relu(self.fc(x))
-        outputs = self.relu(self.fc2(x))
-        outputs = self.relu(self.fc3(outputs))
-        return self.sigmoid(outputs)
+        inputs = torch.cat(dim=1, tensors=[New_X, H])
+        inputs = inputs.float()
+        outputs = self.relu(self.fc(inputs))
+        outputs = self.relu(self.fc2(outputs))
+        return self.sigmoid(self.fc3(outputs))
 
-def sample_Z(m, n):
-    return np.random.uniform(0., 0.01, size = [m, n])        
-
-# Mini-batch generation
-def sample_idx(m, n):
-    A = np.random.permutation(m)
-    idx = A[:n]
-    return idx
 
 generator = Generator()
 discriminator = Discriminator()
@@ -181,17 +179,9 @@ def test_loss(X, M, New_X):
 optimizer_D = torch.optim.Adam(params=generator.parameters(), lr = 1)
 optimizer_G = torch.optim.Adam(params=discriminator.parameters(), lr = 1)
 
-def init_weights(m):
-    if type(m) == nn.Linear:
-        torch.nn.init.xavier_uniform(m.weight)
-        m.bias.data.fill_(0.01)
-
-generator.apply(init_weights)
-discriminator.apply(init_weights)
-
 # Start Iterations
 for it in tqdm(range(5000)):    
-    
+
     #%% Inputs
     mb_idx = sample_idx(Train_No, mb_size)
     X_mb = trainX[mb_idx,:]  
@@ -225,7 +215,9 @@ for it in tqdm(range(5000)):
     if it % 100 == 0:
         print('Iter: {}'.format(it),end='\t')
         print('Train_loss: {:.4}'.format(np.sqrt(MSE_train_loss_curr.item())),end='\t')
-        print('Test_loss: {:.4}'.format(np.sqrt(MSE_test_loss_curr.item())))
+        print('Test_loss: {:.4}'.format(np.sqrt(MSE_test_loss_curr.item())),end='\t')
+        print('G_loss: {:.4}'.format(D_loss_curr),end='\t')
+        print('D_loss: {:.4}'.format(G_loss_curr))
 
 Z_mb = sample_Z(Test_No, Dim) 
 M_mb = testM
