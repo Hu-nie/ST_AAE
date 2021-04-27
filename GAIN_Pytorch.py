@@ -181,7 +181,7 @@ optimizer_G = torch.optim.Adam(params=discriminator.parameters(), lr = 1)
 
 # Start Iterations
 for it in tqdm(range(5000)):    
-
+    asd
     #%% Inputs
     mb_idx = sample_idx(Train_No, mb_size)
     X_mb = trainX[mb_idx,:]  
