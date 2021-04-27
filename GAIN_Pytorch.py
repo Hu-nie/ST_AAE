@@ -7,8 +7,9 @@ import torch.nn as nn
 
 torch.manual_seed(1)
 
-dataset_file = 'data/V_228.csv'  # 'Letter.csv' for Letter dataset an 'Spam.csv' for Spam dataset
-torch.cuda.set_device(0)
+dataset_file = 'data/V_228.csv'
+
+device = torch.device("cuda:0,1")
 
 
 # System Parameters
@@ -47,9 +48,6 @@ for i in range(Dim):
     Max_Val[i] = np.max(Data[:,i])
     Data[:,i] = Data[:,i] / (np.max(Data[:,i]) + 1e-6)    
     
-
-
-
 # Missing introducing
 p_miss_vec = p_miss * np.ones((Dim,1)) 
    
@@ -60,9 +58,9 @@ for i in range(Dim):
     B = A > p_miss_vec[i]
     Missing[:,i] = 1.*B
 
-    
+
 #% Train Test Division    
-   
+
 idx = np.random.permutation(No)
 
 Train_No = int(No * train_rate)
@@ -189,7 +187,6 @@ def init_weights(m):
         m.bias.data.fill_(0.01)
 
 generator.apply(init_weights)
-    
 discriminator.apply(init_weights)
 
 # Start Iterations
