@@ -7,9 +7,9 @@ import torch.nn as nn
 from utils import *
 
 dataset_file = 'data/V_228.csv'
-
-device = torch.device("cuda:0,1")
-
+use_gpu = True  # set it to True to use GPU and False to use CPU
+if use_gpu:
+    torch.cuda.set_device(1)
 
 # System Parameters
 # 1. Mini batch size
@@ -17,7 +17,7 @@ mb_size = 128
 # 2. Missing rate
 p_miss = 0.2
 # 3. Hint rate
-p_hint = 0.9
+p_hint = 0.8
 # 4. Loss Hyperparameters
 alpha = 10
 # 5. Train Rate
@@ -58,7 +58,7 @@ for i in range(Dim):
     Missing[:,i] = 1.*B
 
 
-#% Train Test Division    
+# Train Test Division    
 
 idx = np.random.permutation(No)
 
@@ -80,23 +80,23 @@ class Generator(nn.Module):
         self.fc = nn.Linear(456, 228, bias=True)
         self.fc2 = nn.Linear(228, 228, bias=True)
         self.fc3 = nn.Linear(228, 228, bias=True)
-        self.relu = nn.ReLU(True)
+        self.ReLU = nn.ReLU(True)
         self.sigmoid = nn.Sigmoid()
 
-        nn.init.zeros_(self.fc.bias)
-        nn.init.zeros_(self.fc2.bias)
-        nn.init.zeros_(self.fc3.bias)
+        # nn.init.zeros_(self.fc.bias)
+        # nn.init.zeros_(self.fc2.bias)
+        # nn.init.zeros_(self.fc3.bias)
 
-        nn.init.xavier_normal_(self.fc.weight)
-        nn.init.xavier_normal_(self.fc2.weight)
-        nn.init.xavier_normal_(self.fc3.weight)
-        
+        # nn.init.xavier_uniform_(self.fc.weight)
+        # nn.init.xavier_uniform_(self.fc2.weight)
+        # nn.init.xavier_uniform_(self.fc3.weight)
+
 
     def forward(self,  New_X, M):
         inputs = torch.cat(dim=1, tensors=[New_X, M])
         inputs = inputs.float()
-        outputs = self.relu(self.fc(inputs))
-        outputs = self.relu(self.fc2(outputs))
+        outputs = self.ReLU(self.fc(inputs))
+        outputs = self.ReLU(self.fc2(outputs))
         return self.sigmoid(self.fc3(outputs))
 
 
@@ -106,36 +106,34 @@ class Discriminator(nn.Module):
         self.fc = nn.Linear(456, 228, bias=True)
         self.fc2 = nn.Linear(228, 228, bias=True)
         self.fc3 = nn.Linear(228, 228, bias=True)
-        self.relu = nn.ReLU(True)
+        self.ReLU = nn.ReLU(True)
         self.sigmoid = nn.Sigmoid()
 
-        nn.init.zeros_(self.fc.bias)
-        nn.init.zeros_(self.fc2.bias)
-        nn.init.zeros_(self.fc3.bias)
+        # nn.init.zeros_(self.fc.bias)
+        # nn.init.zeros_(self.fc2.bias)
+        # nn.init.zeros_(self.fc3.bias)
 
-        nn.init.zeros_(self.fc.bias)
-        nn.init.zeros_(self.fc2.bias)
-        nn.init.zeros_(self.fc3.bias)
-
-        nn.init.xavier_normal_(self.fc.weight)
-        nn.init.xavier_normal_(self.fc2.weight)
-        nn.init.xavier_normal_(self.fc3.weight)
+        # nn.init.xavier_uniform_(self.fc.weight)
+        # nn.init.xavier_uniform_(self.fc2.weight)
+        # nn.init.xavier_uniform_(self.fc3.weight)
 
     def forward(self,New_X, H):
         inputs = torch.cat(dim=1, tensors=[New_X, H])
         inputs = inputs.float()
-        outputs = self.relu(self.fc(inputs))
-        outputs = self.relu(self.fc2(outputs))
+        outputs = self.ReLU(self.fc(inputs))
+        outputs = self.ReLU(self.fc2(outputs))
         return self.sigmoid(self.fc3(outputs))
 
 
 generator = Generator()
 discriminator = Discriminator()
 
+
+
 def discriminator_loss(M, New_X, H):
-    # Combine with original data
+    # Generator
     G_sample = generator(New_X,M)
-    
+    # Combine with original data
     Hat_New_X = New_X * M + G_sample * (1-M)
 
     # Discriminator
@@ -175,13 +173,15 @@ def test_loss(X, M, New_X):
     MSE_test_loss = torch.mean(((1-M) * X - (1-M)*G_sample)**2) / torch.mean(1-M)
     return MSE_test_loss, G_sample
 
+# optimizer_D = torch.optim.Adam(params=theta_D)
+# optimizer_G = torch.optim.Adam(params=theta_G)
 
-optimizer_D = torch.optim.Adam(params=generator.parameters(), lr = 1)
-optimizer_G = torch.optim.Adam(params=discriminator.parameters(), lr = 1)
+optimizer_D = torch.optim.Adam(params=generator.parameters())
+optimizer_G = torch.optim.Adam(params=discriminator.parameters())
 
 # Start Iterations
 for it in tqdm(range(5000)):    
-
+    
     #%% Inputs
     mb_idx = sample_idx(Train_No, mb_size)
     X_mb = trainX[mb_idx,:]  
@@ -219,6 +219,7 @@ for it in tqdm(range(5000)):
         print('G_loss: {:.4}'.format(D_loss_curr),end='\t')
         print('D_loss: {:.4}'.format(G_loss_curr))
 
+
 Z_mb = sample_Z(Test_No, Dim) 
 M_mb = testM
 X_mb = testX
@@ -248,3 +249,4 @@ for i in range(Dim):
     renomal[:,i] = renomal[:,i]+ Min_Val[i]
     
 print(renomal.cpu().detach().numpy())
+
