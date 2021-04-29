@@ -91,7 +91,7 @@ for it in range(5000):
     Z_mb = sample_Z(mb_size, Dim) 
     M_mb = trainM[mb_idx,:]  
     H_mb1 = sample_M(mb_size, Dim, 1-p_hint)
-    H_mb = M_mb * H_mb1 + 0.5*(1-H_mb1)
+    H_mb = M_mb * H_mb1 
     
     New_X_mb = M_mb * X_mb + (1-M_mb) * Z_mb  # Missing Data Introduce
     
@@ -132,3 +132,44 @@ for it in range(5000):
         print('Test_loss: {:.4}'.format(np.sqrt(G_mse_test.item())),end='\t')
         print('G_loss: {:.4}'.format(G_loss),end='\t')
         print('D_loss: {:.4}'.format(D_loss))
+
+
+def test_loss(X, M):
+    
+    
+    #%% MSE Performance metric
+    MSE_test_loss = torch.mean(((1-M) * X - (1-M)*G_sample)**2) / torch.mean(1-M)
+    return MSE_test_loss
+
+G_sample = netG(X_mb, New_X_mb, M_mb)
+
+Z_mb = sample_Z(Test_No, Dim) 
+M_mb = testM
+X_mb = testX
+        
+New_X_mb = M_mb * X_mb + (1-M_mb) * Z_mb  # Missing Data Introduce
+
+X_mb = torch.tensor(X_mb).float()
+M_mb = torch.tensor(M_mb).float()
+New_X_mb = torch.tensor(New_X_mb).float()
+
+MSE_final= test_loss(X=X_mb, M=M_mb)
+print('Final Test RMSE: ' + str(np.sqrt(MSE_final.item())))
+
+imputed_data = M_mb * X_mb + (1-M_mb) * G_sample
+print("Imputed test data:")
+np.set_printoptions(formatter={'float': lambda x: "{0:0.8f}".format(x)})
+
+
+print(imputed_data.detach().numpy())
+
+# Normalization (0 to 1)
+renomal = imputed_data 
+
+for i in range(Dim):
+    renomal[:,i] = renomal[:,i]* (Max_Val[i]+1e-6)
+    renomal[:,i] = renomal[:,i]+ Min_Val[i]
+    
+print(renomal.cpu().detach().numpy())
+
+renomal.size()
