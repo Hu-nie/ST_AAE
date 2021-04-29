@@ -1,15 +1,15 @@
 import torch
 import numpy as np
-# from tqdm import tqdm
 from tqdm import tqdm
+# from tqdm.notebook import tqdm_notebook as tqdm
 import torch.nn.functional as F
 import torch.nn as nn
 from utils import *
+torch.manual_seed(1)
+np.random.seed(0)
 
-dataset_file = 'data/V_228.csv'
-use_gpu = True  # set it to True to use GPU and False to use CPU
-if use_gpu:
-    torch.cuda.set_device(1)
+dataset_file = 'data/V_228.csv'  # 'Letter.csv' for Letter dataset an 'Spam.csv' for Spam dataset
+torch.cuda.set_device(0)
 
 # System Parameters
 # 1. Mini batch size
@@ -47,7 +47,10 @@ for i in range(Dim):
     Max_Val[i] = np.max(Data[:,i])
     Data[:,i] = Data[:,i] / (np.max(Data[:,i]) + 1e-6)    
     
-# Missing introducing
+
+
+
+#Missing introducing
 p_miss_vec = p_miss * np.ones((Dim,1)) 
    
 Missing = np.zeros((No,Dim))
@@ -57,9 +60,9 @@ for i in range(Dim):
     B = A > p_miss_vec[i]
     Missing[:,i] = 1.*B
 
-
-# Train Test Division    
-
+    
+#  Train Test Division    
+   
 idx = np.random.permutation(No)
 
 Train_No = int(No * train_rate)
@@ -74,29 +77,31 @@ trainM = Missing[idx[:Train_No],:]
 testM = Missing[idx[Train_No:],:]
 
 
+
 class Generator(nn.Module):
     def __init__(self):
         super().__init__()
         self.fc = nn.Linear(456, 228, bias=True)
         self.fc2 = nn.Linear(228, 228, bias=True)
         self.fc3 = nn.Linear(228, 228, bias=True)
-        self.ReLU = nn.ReLU(True)
+        self.relu = nn.ReLU(True)
         self.sigmoid = nn.Sigmoid()
-
-        # nn.init.zeros_(self.fc.bias)
-        # nn.init.zeros_(self.fc2.bias)
-        # nn.init.zeros_(self.fc3.bias)
-
-        # nn.init.xavier_uniform_(self.fc.weight)
-        # nn.init.xavier_uniform_(self.fc2.weight)
-        # nn.init.xavier_uniform_(self.fc3.weight)
-
 
     def forward(self,  New_X, M):
         inputs = torch.cat(dim=1, tensors=[New_X, M])
         inputs = inputs.float()
-        outputs = self.ReLU(self.fc(inputs))
-        outputs = self.ReLU(self.fc2(outputs))
+        self.fc.weight = torch.nn.Parameter(torch.FloatTensor(xavier_init([228,456]),requires_grad=True))
+        self.fc2.weight = torch.nn.Parameter(torch.FloatTensor(xavier_init([228,228])))
+        self.fc3.weight = torch.nn.Parameter(torch.FloatTensor(xavier_init([228,228])))
+        #nn.init.xavier_uniform_(self.fc.weight,gain= (1. / np.sqrt(456 / 2.)))
+        #nn.init.xavier_uniform_(self.fc2.weight,gain= (1. / np.sqrt(228 / 2.)))
+        #nn.init.xavier_uniform_(self.fc3.weight,gain= (1. / np.sqrt(228 / 2.)))
+        nn.init.zeros_(self.fc.bias)
+        nn.init.zeros_(self.fc2.bias)
+        nn.init.zeros_(self.fc3.bias)
+
+        outputs = self.relu(self.fc(inputs))
+        outputs = self.relu(self.fc2(outputs))
         return self.sigmoid(self.fc3(outputs))
 
 
@@ -106,28 +111,24 @@ class Discriminator(nn.Module):
         self.fc = nn.Linear(456, 228, bias=True)
         self.fc2 = nn.Linear(228, 228, bias=True)
         self.fc3 = nn.Linear(228, 228, bias=True)
-        self.ReLU = nn.ReLU(True)
+        self.relu = nn.ReLU(True)
         self.sigmoid = nn.Sigmoid()
-
-        # nn.init.zeros_(self.fc.bias)
-        # nn.init.zeros_(self.fc2.bias)
-        # nn.init.zeros_(self.fc3.bias)
-
-        # nn.init.xavier_uniform_(self.fc.weight)
-        # nn.init.xavier_uniform_(self.fc2.weight)
-        # nn.init.xavier_uniform_(self.fc3.weight)
 
     def forward(self,New_X, H):
         inputs = torch.cat(dim=1, tensors=[New_X, H])
         inputs = inputs.float()
-        outputs = self.ReLU(self.fc(inputs))
-        outputs = self.ReLU(self.fc2(outputs))
+        self.fc.weight = torch.nn.Parameter(torch.FloatTensor(xavier_init([228,456])))
+        self.fc2.weight = torch.nn.Parameter(torch.FloatTensor(xavier_init([228,228])))
+        self.fc3.weight = torch.nn.Parameter(torch.FloatTensor(xavier_init([228,228])))
+        #nn.init.xavier_uniform_(self.fc.weight,gain= (1. / np.sqrt(456 / 2.)))
+        #nn.init.xavier_uniform_(self.fc2.weight,gain= (1. / np.sqrt(228 / 2.)))
+        #nn.init.xavier_uniform_(self.fc3.weight,gain= (1. / np.sqrt(228 / 2.)))
+        nn.init.zeros_(self.fc.bias)
+        nn.init.zeros_(self.fc2.bias)
+        nn.init.zeros_(self.fc3.bias)
+        outputs = self.relu(self.fc(inputs))
+        outputs = self.relu(self.fc2(outputs))
         return self.sigmoid(self.fc3(outputs))
-
-
-generator = Generator()
-discriminator = Discriminator()
-
 
 
 def discriminator_loss(M, New_X, H):
@@ -173,8 +174,8 @@ def test_loss(X, M, New_X):
     MSE_test_loss = torch.mean(((1-M) * X - (1-M)*G_sample)**2) / torch.mean(1-M)
     return MSE_test_loss, G_sample
 
-# optimizer_D = torch.optim.Adam(params=theta_D)
-# optimizer_G = torch.optim.Adam(params=theta_G)
+generator = Generator()
+discriminator = Discriminator()
 
 optimizer_D = torch.optim.Adam(params=generator.parameters())
 optimizer_G = torch.optim.Adam(params=discriminator.parameters())
@@ -193,20 +194,18 @@ for it in tqdm(range(5000)):
     
     New_X_mb = M_mb * X_mb + (1-M_mb) * Z_mb  # Missing Data Introduce
     
-
+    
     X_mb = torch.tensor(X_mb)
     M_mb = torch.tensor(M_mb)
     H_mb = torch.tensor(H_mb)
     New_X_mb = torch.tensor(New_X_mb)
     
-    
     optimizer_D.zero_grad()
     D_loss_curr = discriminator_loss(M=M_mb, New_X=New_X_mb, H=H_mb)
     D_loss_curr.backward()
     optimizer_D.step()
- 
+    
     optimizer_G.zero_grad()
-    #print(M_mb.shape)
     G_loss_curr, MSE_train_loss_curr, MSE_test_loss_curr = generator_loss(X=X_mb, M=M_mb, New_X=New_X_mb, H=H_mb)
     G_loss_curr.backward()
     optimizer_G.step()    
@@ -216,37 +215,5 @@ for it in tqdm(range(5000)):
         print('Iter: {}'.format(it),end='\t')
         print('Train_loss: {:.4}'.format(np.sqrt(MSE_train_loss_curr.item())),end='\t')
         print('Test_loss: {:.4}'.format(np.sqrt(MSE_test_loss_curr.item())),end='\t')
-        print('G_loss: {:.4}'.format(D_loss_curr),end='\t')
-        print('D_loss: {:.4}'.format(G_loss_curr))
-
-
-Z_mb = sample_Z(Test_No, Dim) 
-M_mb = testM
-X_mb = testX
-        
-New_X_mb = M_mb * X_mb + (1-M_mb) * Z_mb  # Missing Data Introduce
-
-X_mb = torch.tensor(X_mb)
-M_mb = torch.tensor(M_mb)
-New_X_mb = torch.tensor(New_X_mb)
-
-    
-MSE_final, Sample = test_loss(X=X_mb, M=M_mb, New_X=New_X_mb)
-        
-print('Final Test RMSE: ' + str(np.sqrt(MSE_final.item())))
-
-
-imputed_data = M_mb * X_mb + (1-M_mb) * Sample
-print("Imputed test data:")
-np.set_printoptions(formatter={'float': lambda x: "{0:0.8f}".format(x)})
-print(imputed_data.detach().numpy())
-
-# Normalization (0 to 1)
-renomal = imputed_data 
-
-for i in range(Dim):
-    renomal[:,i] = renomal[:,i]* (Max_Val[i]+1e-6)
-    renomal[:,i] = renomal[:,i]+ Min_Val[i]
-    
-print(renomal.cpu().detach().numpy())
-
+        print('G_loss: {:.4}'.format(G_loss_curr),end='\t')
+        print('D_loss: {:.4}'.format(D_loss_curr))

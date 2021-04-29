@@ -8,7 +8,7 @@ def sample_M(m, n, p):
     return C
 
 def xavier_init(size):
-    in_dim = size[0]
+    in_dim = size[1]
     xavier_stddev = 1. / np.sqrt(in_dim / 2.)
     return np.random.normal(size = size, scale = xavier_stddev)
 
