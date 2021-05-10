@@ -10,7 +10,7 @@ mb_size = 128
 # 2. Missing rate
 p_miss = 0.2
 # 3. Hint rate
-p_hint = 0.9
+p_hint = 0
 # 4. Loss Hyperparameters
 alpha = 10
 # 5. Train Rate
@@ -135,8 +135,6 @@ for it in range(5000):
 
 
 def test_loss(X, M):
-    
-    
     #%% MSE Performance metric
     MSE_test_loss = torch.mean(((1-M) * X - (1-M)*G_sample)**2) / torch.mean(1-M)
     return MSE_test_loss
